@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Peer Recognition Platform</title>
+<style>
+body{
+  font-family: Arial, sans-serif;
+  background:#f4f6fb;
+  margin:0;
+  padding:20px;
+}
+.hidden{display:none;}
+.container{
+  max-width:900px;
+  margin:auto;
+}
+.card{
+  background:white;
+  padding:20px;
+  border-radius:15px;
+  box-shadow:0 4px 15px rgba(0,0,0,0.1);
+  margin-bottom:20px;
+}
+button{
+  background:#ff8c42;
+  border:none;
+  padding:10px 15px;
+  border-radius:10px;
+  color:white;
+  cursor:pointer;
+  margin-top:10px;
+}
+button:hover{opacity:0.9;}
+input,select,textarea{
+  width:100%;
+  padding:8px;
+  margin:5px 0;
+  border-radius:8px;
+  border:1px solid #ccc;
+}
+.category{
+  display:inline-block;
+  padding:15px;
+  margin:10px;
+  border-radius:15px;
+  background:#d9f0ff;
+  cursor:pointer;
+}
+.category.selected{
+  background:#a4e0ff;
+}
+.nav{
+  display:flex;
+  justify-content:space-between;
+  margin-bottom:20px;
+}
+.badge{
+  padding:6px 10px;
+  border-radius:10px;
+  background:gold;
+  display:inline-block;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<!-- LOGIN -->
+<div id="loginView" class="card">
+  <h2>Employee Recognition Login</h2>
+  <input id="loginEmail" placeholder="Email">
+  <input id="loginPass" type="password" placeholder="Password">
+  <button onclick="login()">Login</button>
+  <p><b>Default Admin:</b> admin@company.com / admin123</p>
+</div>
+
+<!-- MAIN APP -->
+<div id="appView" class="hidden">
+
+<div class="nav">
+  <div>
+    <button onclick="showDashboard()">Dashboard</button>
+    <button onclick="showProfile()">My Profile</button>
+    <button id="adminBtn" onclick="showAdmin()">Admin</button>
+  </div>
+  <button onclick="logout()">Logout</button>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard" class="card">
+  <h2>Recognize a Colleague</h2>
+  <select id="userSelect"></select>
+
+  <div>
+    <div class="category" onclick="selectCategory(this,'Lifesaver')">🌟 Lifesaver</div>
+    <div class="category" onclick="selectCategory(this,'Emotional Anchor')">💚 Emotional Anchor</div>
+    <div class="category" onclick="selectCategory(this,'Detail Detective')">🔍 Detail Detective</div>
+    <div class="category" onclick="selectCategory(this,'Culture Spark')">🎉 Culture Spark</div>
+  </div>
+
+  <input id="rating" type="number" min="1" max="5" placeholder="Rating 1-5">
+  <textarea id="message" placeholder="Optional message"></textarea>
+  <button onclick="submitRecognition()">Submit Recognition</button>
+</div>
+
+<!-- PROFILE -->
+<div id="profile" class="card hidden">
+  <h2>My Profile</h2>
+  <div id="profileStats"></div>
+  <h3>Recognition History</h3>
+  <div id="history"></div>
+</div>
+
+<!-- ADMIN -->
+<div id="admin" class="card hidden">
+  <h2>Admin Dashboard</h2>
+
+  <h3>Add User</h3>
+  <input id="newName" placeholder="Name">
+  <input id="newEmail" placeholder="Email">
+  <input id="newPass" placeholder="Password">
+  <select id="newRole">
+    <option value="employee">Employee</option>
+    <option value="admin">Admin</option>
+  </select>
+  <button onclick="addUser()">Add User</button>
+
+  <h3>Leaderboard</h3>
+  <div id="leaderboard"></div>
+</div>
+
+</div>
+</div>
+
+<script>
+let currentUser=null;
+let selectedCategory=null;
+
+// Initialize storage
+if(!localStorage.users){
+  const defaultUsers=[
+    {id:1,name:"Admin",email:"admin@company.com",password:"admin123",role:"admin"},
+    {id:2,name:"Jane",email:"jane@company.com",password:"1234",role:"employee"},
+    {id:3,name:"Mike",email:"mike@company.com",password:"1234",role:"employee"}
+  ];
+  localStorage.users=JSON.stringify(defaultUsers);
+  localStorage.recognitions=JSON.stringify([]);
+}
+
+function getUsers(){ return JSON.parse(localStorage.users); }
+function getRecognitions(){ return JSON.parse(localStorage.recognitions); }
+function saveUsers(users){ localStorage.users=JSON.stringify(users); }
+function saveRecognitions(rec){ localStorage.recognitions=JSON.stringify(rec); }
+
+function login(){
+  const email=document.getElementById("loginEmail").value;
+  const pass=document.getElementById("loginPass").value;
+  const user=getUsers().find(u=>u.email===email && u.password===pass);
+  if(!user){ alert("Invalid login"); return; }
+  currentUser=user;
+  document.getElementById("loginView").classList.add("hidden");
+  document.getElementById("appView").classList.remove("hidden");
+  document.getElementById("adminBtn").style.display=user.role==="admin"?"inline-block":"none";
+  loadUsers();
+  showDashboard();
+}
+
+function logout(){
+  currentUser=null;
+  location.reload();
+}
+
+function loadUsers(){
+  const select=document.getElementById("userSelect");
+  select.innerHTML="";
+  getUsers().forEach(u=>{
+    if(u.id!==currentUser.id){
+      const opt=document.createElement("option");
+      opt.value=u.id;
+      opt.textContent=u.name;
+      select.appendChild(opt);
+    }
+  });
+}
+
+function selectCategory(el,cat){
+  document.querySelectorAll(".category").forEach(c=>c.classList.remove("selected"));
+  el.classList.add("selected");
+  selectedCategory=cat;
+}
+
+function submitRecognition(){
+  const receiverId=parseInt(document.getElementById("userSelect").value);
+  const rating=parseInt(document.getElementById("rating").value);
+  const message=document.getElementById("message").value;
+
+  if(!selectedCategory){alert("Select category");return;}
+  if(!rating || rating<1 || rating>5){alert("Rating 1-5");return;}
+
+  const rec=getRecognitions();
+  rec.push({
+    sender:currentUser.id,
+    receiver:receiverId,
+    category:selectedCategory,
+    rating:rating,
+    message:message,
+    date:new Date().toLocaleString()
+  });
+  saveRecognitions(rec);
+  alert("Recognition submitted!");
+}
+
+function showDashboard(){
+  dashboard.classList.remove("hidden");
+  profile.classList.add("hidden");
+  admin.classList.add("hidden");
+}
+
+function showProfile(){
+  dashboard.classList.add("hidden");
+  profile.classList.remove("hidden");
+  admin.classList.add("hidden");
+  loadProfile();
+}
+
+function showAdmin(){
+  dashboard.classList.add("hidden");
+  profile.classList.add("hidden");
+  admin.classList.remove("hidden");
+  loadLeaderboard();
+}
+
+function loadProfile(){
+  const rec=getRecognitions().filter(r=>r.receiver===currentUser.id);
+  const total=rec.length;
+  const avg=total? (rec.reduce((a,b)=>a+b.rating,0)/total).toFixed(2):0;
+  const points=total*10;
+
+  let badge="No Badge";
+  if(points>=500) badge="Gold";
+  else if(points>=250) badge="Silver";
+  else if(points>=100) badge="Bronze";
+
+  document.getElementById("profileStats").innerHTML=
+    `<p>Total Recognitions: ${total}</p>
+     <p>Points: ${points}</p>
+     <p>Average Rating: ${avg}</p>
+     <p class="badge">${badge}</p>`;
+
+  document.getElementById("history").innerHTML=
+    rec.map(r=>`<div class="card">
+      <b>${r.category}</b> (${r.rating}⭐)
+      <p>${r.message}</p>
+      <small>${r.date}</small>
+    </div>`).join("");
+}
+
+function addUser(){
+  const users=getUsers();
+  const id=users.length+1;
+  users.push({
+    id:id,
+    name:newName.value,
+    email:newEmail.value,
+    password:newPass.value,
+    role:newRole.value
+  });
+  saveUsers(users);
+  alert("User added");
+}
+
+function loadLeaderboard(){
+  const users=getUsers();
+  const rec=getRecognitions();
+  const ranking=users.map(u=>{
+    const total=rec.filter(r=>r.receiver===u.id).length;
+    return {name:u.name,total};
+  }).sort((a,b)=>b.total-a.total);
+
+  document.getElementById("leaderboard").innerHTML=
+    ranking.map(r=>`<p>${r.name} - ${r.total} recognitions</p>`).join("");
+}
+</script>
+
+</body>
+</html>
